@@ -3743,6 +3743,7 @@ inline static void ggml_vec_norm_f32 (const int n, float * s, const float * x) {
 inline static void ggml_vec_sqr_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = x[i]*x[i];   }
 inline static void ggml_vec_sqrt_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = sqrtf(x[i]); }
 inline static void ggml_vec_log_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = logf(x[i]);   }
+inline static void ggml_vec_log2_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = log2f(x[i]);   }
 inline static void ggml_vec_abs_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = fabsf(x[i]); }
 inline static void ggml_vec_sgn_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? 1.f : ((x[i] < 0.f) ? -1.f : 0.f); }
 inline static void ggml_vec_step_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? 1.f : 0.f; }
@@ -4001,7 +4002,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 68, "GGML_OP_COUNT != 68");
+static_assert(GGML_OP_COUNT == 69, "GGML_OP_COUNT != 68");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -4083,7 +4084,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 68, "GGML_OP_COUNT != 68");
+static_assert(GGML_OP_COUNT == 69, "GGML_OP_COUNT != 68");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -5634,7 +5635,8 @@ struct ggml_tensor * ggml_sqrt_inplace(
 static struct ggml_tensor * ggml_log_impl(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
-        bool inplace) {
+        bool inplace,
+        bool log2) {
     bool is_node = false;
 
     if (!inplace && (a->grad)) {
@@ -5643,9 +5645,17 @@ static struct ggml_tensor * ggml_log_impl(
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
-    result->op   = GGML_OP_LOG;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
+    if(log2)
+    {
+        result->op   = GGML_OP_LOG2;
+        result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+        result->src[0] = a;
+    }
+    else{
+        result->op   = GGML_OP_LOG;
+        result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+        result->src[0] = a;
+    }
 
     return result;
 }
@@ -5653,13 +5663,25 @@ static struct ggml_tensor * ggml_log_impl(
 struct ggml_tensor * ggml_log(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_log_impl(ctx, a, false);
+    return ggml_log_impl(ctx, a, false, false);
 }
 
 struct ggml_tensor * ggml_log_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_log_impl(ctx, a, true);
+    return ggml_log_impl(ctx, a, true, false);
+}
+
+struct ggml_tensor * ggml_log2(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    return ggml_log_impl(ctx, a, false, true);
+}
+
+struct ggml_tensor * ggml_log2_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    return ggml_log_impl(ctx, a, true, true);
 }
 
 // ggml_sum
@@ -9788,6 +9810,32 @@ static void ggml_compute_forward_log_f32(
     }
 }
 
+// ggml_compute_forward_log
+
+static void ggml_compute_forward_log2_f32(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        struct ggml_tensor * dst) {
+    GGML_ASSERT(params->ith == 0);
+    GGML_ASSERT(ggml_are_same_shape(src0, dst));
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    const int n  = ggml_nrows(src0);
+    const int nc = src0->ne[0];
+
+    GGML_ASSERT( dst->nb[0] == sizeof(float));
+    GGML_ASSERT(src0->nb[0] == sizeof(float));
+
+    for (int i = 0; i < n; i++) {
+        ggml_vec_log2_f32(nc,
+                (float *) ((char *) dst->data  + i*( dst->nb[1])),
+                (float *) ((char *) src0->data + i*(src0->nb[1])));
+    }
+}
+
 static void ggml_compute_forward_log(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -9796,6 +9844,22 @@ static void ggml_compute_forward_log(
         case GGML_TYPE_F32:
             {
                 ggml_compute_forward_log_f32(params, src0, dst);
+            } break;
+        default:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+}
+
+static void ggml_compute_forward_log2(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        struct ggml_tensor * dst) {
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_log2_f32(params, src0, dst);
             } break;
         default:
             {
@@ -15735,6 +15799,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_log(params, tensor->src[0], tensor);
             } break;
+        case GGML_OP_LOG2:
+            {
+                ggml_compute_forward_log2(params, tensor->src[0], tensor);
+            } break;
         case GGML_OP_SUM:
             {
                 ggml_compute_forward_sum(params, tensor->src[0], tensor);
@@ -16134,6 +16202,18 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 }
             } break;
         case GGML_OP_LOG:
+            {
+                if (src0->grad) {
+                    src0->grad =
+                        ggml_add_impl(ctx,
+                                src0->grad,
+                                ggml_div(ctx,
+                                    tensor->grad,
+                                    src0),
+                                inplace);
+                }
+            } break;
+        case GGML_OP_LOG2:
             {
                 if (src0->grad) {
                     src0->grad =
@@ -17371,6 +17451,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
             case GGML_OP_SQR:
             case GGML_OP_SQRT:
             case GGML_OP_LOG:
+            case GGML_OP_LOG2:
             case GGML_OP_SUM:
             case GGML_OP_SUM_ROWS:
             case GGML_OP_MEAN:
