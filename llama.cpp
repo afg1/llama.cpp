@@ -1535,6 +1535,25 @@ struct llama_model_loader {
     }
 };
 
+//DoLa util functions
+void llama_get_jsd(struct ggml_context * ctx, struct ggml_tensor * q, struct ggml_tensor * p, struct ggml_tensor * jsd)
+{
+    // Is this the right way to do a constant 2.0?
+    struct ggml_tensor * two = ggml_new_f32(ctx, 2.0f);
+
+
+    struct ggml_tensor * m = ggml_div(ctx, ggml_add(ctx, q, p), two);
+
+    // Calculate KL-divergences
+    struct ggml_tensor * kl_pm  = ggml_sum( ctx, ggml_mul(ctx, q,  ggml_log2(ctx, ggml_div(ctx, q, m))));
+    struct ggml_tensor * kl_qm  = ggml_sum( ctx, ggml_mul(ctx, q,  ggml_log2(ctx, ggml_div(ctx, q, m))));
+
+    // Calculate JSD
+    jsd = ggml_div(ctx, ggml_add(ctx, kl_pm, kl_qm), two);
+
+}
+
+
 //
 // load LLaMA models
 //
