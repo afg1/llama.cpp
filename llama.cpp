@@ -2303,6 +2303,7 @@ static struct ggml_cgraph * llm_build_llama(
             memcpy(inpL->data, embd, N * n_embd * ggml_element_size(inpL));
         }
     }
+    struct ggml_tensor * dola_layer;
 
     const int i_gpu_start = n_layer - n_gpu_layers;
     (void) i_gpu_start;
@@ -2531,6 +2532,10 @@ static struct ggml_cgraph * llm_build_llama(
         cur = ggml_add(ctx0, cur, inpFF);
         offload_func(cur);
         ggml_set_name(cur, "inpFF_+_result_w2");
+        if(il == 10)
+        {
+            dola_layer = ggml_dup_tensor(ctx0, cur);
+        }
 
         // input for next layer
         inpL = cur;
@@ -2552,6 +2557,9 @@ static struct ggml_cgraph * llm_build_llama(
 
     // lm_head
     cur = ggml_mul_mat(ctx0, model.output, cur);
+    struct ggml_tensor * dola_lp = ggml_mul_mat(ctx0, model.output, dola_layer);
+    cur = ggml_sub(ctx0, cur, dola_lp);
+
     ggml_set_name(cur, "result_output");
 
     ggml_build_forward_expand(gf, cur);
