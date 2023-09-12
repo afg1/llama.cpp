@@ -55,6 +55,7 @@ struct ggml_metal_context {
     id<MTLComputePipelineState> pipeline_##name
 
     GGML_METAL_DECL_KERNEL(add);
+    GGML_METAL_DECL_KERNEL(sub);
     GGML_METAL_DECL_KERNEL(add_row); // TODO: avoid this extra kernel, instead extend the "add" kernel to support broadcast
     GGML_METAL_DECL_KERNEL(mul);
     GGML_METAL_DECL_KERNEL(mul_row); // TODO: avoid this extra kernel, instead extend the "mul" kernel to support broadcast
@@ -210,6 +211,7 @@ struct ggml_metal_context * ggml_metal_init(int n_cb) {
         }
 
         GGML_METAL_ADD_KERNEL(add);
+        GGML_METAL_ADD_KERNEL(sub);
         GGML_METAL_ADD_KERNEL(add_row);
         GGML_METAL_ADD_KERNEL(mul);
         GGML_METAL_ADD_KERNEL(mul_row);
@@ -278,6 +280,7 @@ void ggml_metal_free(struct ggml_metal_context * ctx) {
     [ctx->pipeline_##name release];
 
     GGML_METAL_DEL_KERNEL(add);
+    GGML_METAL_DEL_KERNEL(sub);
     GGML_METAL_DEL_KERNEL(add_row);
     GGML_METAL_DEL_KERNEL(mul);
     GGML_METAL_DEL_KERNEL(mul_row);
@@ -726,6 +729,25 @@ void ggml_metal_graph_compute(
                             } else {
                                 [encoder setComputePipelineState:ctx->pipeline_add];
                             }
+                            [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
+                            [encoder setBuffer:id_src1 offset:offs_src1 atIndex:1];
+                            [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
+                            [encoder setBytes:&nb     length:sizeof(nb) atIndex:3];
+
+                            const int64_t n = ggml_nelements(dst)/4;
+
+                            [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                        } break;
+                        case GGML_OP_SUB:
+                        {
+                            GGML_ASSERT(ggml_is_contiguous(src0));
+
+                            // utilize float4
+                            GGML_ASSERT(ne00 % 4 == 0);
+                            const int64_t nb = ne00/4;
+
+
+                            [encoder setComputePipelineState:ctx->pipeline_sub];
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                             [encoder setBuffer:id_src1 offset:offs_src1 atIndex:1];
                             [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
