@@ -321,7 +321,8 @@ extern "C" {
                const llama_token * tokens,
                              int   n_tokens,
                              int   n_past,
-                             int   n_threads);
+                             int   n_threads,
+                             bool  dola);
 
     // Same as llama_eval, but use float matrix input directly.
     LLAMA_API int llama_eval_embd(
@@ -512,7 +513,8 @@ extern "C" {
     /// @param n_past Number of tokens already evaluated.
     /// @param n_predict Maximum number of tokens to predict. EOS may occur earlier.
     /// @param n_threads Number of threads as passed to llama_eval().
-    LLAMA_API void llama_beam_search(struct llama_context * ctx, llama_beam_search_callback_fn_t callback, void * callback_data, size_t n_beams, int n_past, int n_predict, int n_threads);
+    /// @param use_dola If true, use contrastive decoding against earlier layers
+    LLAMA_API void llama_beam_search(struct llama_context * ctx, llama_beam_search_callback_fn_t callback, void * callback_data, size_t n_beams, int n_past, int n_predict, int n_threads, bool use_dola);
 
     // Performance information
     LLAMA_API struct llama_timings llama_get_timings(struct llama_context * ctx);
