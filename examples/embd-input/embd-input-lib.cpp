@@ -99,7 +99,7 @@ bool eval_tokens(void * model, std::vector<llama_token> tokens) {
         if (n_eval > params.n_batch) {
             n_eval = params.n_batch;
         }
-        if (llama_eval(ctx, &tokens[i], n_eval, n_past, params.n_threads)) {
+        if (llama_eval(ctx, &tokens[i], n_eval, n_past, params.n_threads, params.use_dola)) {
             fprintf(stderr, "%s : failed to eval\n", __func__);
             return false;
         }

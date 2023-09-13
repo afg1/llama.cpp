@@ -352,6 +352,8 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             params.interactive = true;
         } else if (arg == "--embedding") {
             params.embedding = true;
+        } else if (arg == "--dola") {
+            params.use_dola = true;
         } else if (arg == "--interactive-first") {
             params.interactive_first = true;
         } else if (arg == "-ins" || arg == "--instruct") {
@@ -773,7 +775,7 @@ std::tuple<struct llama_model *, struct llama_context *> llama_init_from_gpt_par
         LOG("warming up the model with an empty run\n");
 
         const std::vector<llama_token> tmp = { llama_token_bos(lctx), llama_token_eos(lctx), };
-        llama_eval(lctx, tmp.data(), std::min(tmp.size(), (size_t) params.n_batch), 0, params.n_threads);
+        llama_eval(lctx, tmp.data(), std::min(tmp.size(), (size_t) params.n_batch), 0, params.n_threads, params.use_dola);
         llama_reset_timings(lctx);
     }
 

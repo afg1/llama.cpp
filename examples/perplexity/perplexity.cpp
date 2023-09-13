@@ -198,7 +198,7 @@ results_perplexity perplexity_v2(llama_context * ctx, const gpt_params & params)
             const int batch_size  = std::min(end - batch_start, n_batch);
 
             //fprintf(stderr, "    Batch %d: starts at %d, size is %d, n_past is %d\n",j,batch_start,batch_size,j * n_batch);
-            if (llama_eval(ctx, tokens.data() + batch_start, batch_size, j * n_batch, params.n_threads)) {
+            if (llama_eval(ctx, tokens.data() + batch_start, batch_size, j * n_batch, params.n_threads, params.use_dola)) {
                 //fprintf(stderr, "%s : failed to eval\n", __func__);
                 return {tokens, -1, logit_history, prob_history};
             }
@@ -331,7 +331,7 @@ results_perplexity perplexity(llama_context * ctx, const gpt_params & params) {
                 tokens[batch_start] = llama_token_bos(ctx);
             }
 
-            if (llama_eval(ctx, tokens.data() + batch_start, batch_size, j * n_batch, params.n_threads)) {
+            if (llama_eval(ctx, tokens.data() + batch_start, batch_size, j * n_batch, params.n_threads, params.use_dola)) {
                 fprintf(stderr, "%s : failed to eval\n", __func__);
                 return {tokens, -1, logit_history, prob_history};
             }
@@ -408,7 +408,7 @@ std::vector<float> hellaswag_evaluate_tokens(llama_context * ctx, const std::vec
     for (size_t i_chunk = 0; i_chunk < n_chunk; ++i_chunk) {
         size_t n_tokens = tokens.size() - i_chunk * n_batch;
         n_tokens = std::min(n_tokens, size_t(n_batch));
-        if (llama_eval(ctx, tokens.data() + i_chunk * n_batch, n_tokens, n_past, n_thread)) {
+        if (llama_eval(ctx, tokens.data() + i_chunk * n_batch, n_tokens, n_past, n_thread, false)) {
             fprintf(stderr, "%s : failed to eval\n", __func__);
             return {};
         }

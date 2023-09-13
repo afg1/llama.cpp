@@ -205,7 +205,7 @@ int main(int argc, char ** argv) {
             LOG_TEE("%s: testing memory usage for n_batch = %d, n_ctx = %d\n", __func__, params.n_batch, params.n_ctx);
 
             const std::vector<llama_token> tmp(params.n_batch, llama_token_bos(ctx));
-            llama_eval(ctx, tmp.data(), tmp.size(), params.n_ctx, params.n_threads);
+            llama_eval(ctx, tmp.data(), tmp.size(), params.n_ctx, params.n_threads, params.use_dola);
         }
 
         llama_print_timings(ctx);
@@ -595,7 +595,7 @@ int main(int argc, char ** argv) {
 
                 for (int i = 0; i < input_size; i += params.n_batch) {
                     int n_eval = std::min(input_size - i, params.n_batch);
-                    if (llama_eval(ctx_guidance, input_buf + i, n_eval, n_past_guidance, params.n_threads)) {
+                    if (llama_eval(ctx_guidance, input_buf + i, n_eval, n_past_guidance, params.n_threads, params.use_dola)) {
                         LOG_TEE("%s : failed to eval\n", __func__);
                         return 1;
                     }
@@ -612,7 +612,7 @@ int main(int argc, char ** argv) {
 
                 LOG("eval: %s\n", LOG_TOKENS_TOSTR_PRETTY(ctx, embd));
 
-                if (llama_eval(ctx, &embd[i], n_eval, n_past, params.n_threads)) {
+                if (llama_eval(ctx, &embd[i], n_eval, n_past, params.n_threads, params.use_dola)) {
                     LOG_TEE("%s : failed to eval\n", __func__);
                     return 1;
                 }
